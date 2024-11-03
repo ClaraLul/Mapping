@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VR Graph with Labels Following Nodes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://threejs.org/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+</head>
+<body>
+<a-scene background="color: #000000"> <!-- Set a darker background color -->
+    <!-- Camera and Lighting -->
+    <a-entity id="camera" camera position="0 2 5" wasd-controls="enabled: false" look-controls="enabled: true"></a-entity>
+    <a-light type="ambient" color="#FFFFFF"></a-light>
+    <a-light type="directional" intensity="0.5" position="-1 2 2"></a-light>
+
+    <!-- Teleport Controls -->
+    <a-entity id="rig" movement-controls="enabled: true" position="0 1.6 5">
+        <a-camera id="user-camera"></a-camera>
+        <a-entity laser-controls="hand: right"></a-entity>
+    </a-entity>
+
+    <!-- Video Plane for node video display -->
+    <a-plane id="videoPlane" position="0 1.5 -2" width="2" height="1.2" visible="false"></a-plane>
+
+    
+<script>
+    // Enhanced interaction functionality for both desktop and VR
+    const videoPlane = document.querySelector('#videoPlane');
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Function to show video when a node is clicked
+    function showVideo(videoUrl) {
+        videoPlane.setAttribute('visible', true);
+        videoPlane.setAttribute('material', `shader: flat; src: ${videoUrl}; transparent: true; opacity: 1; side: double`);
+        videoPlane.object3D.position.set(0, 1.5, -3); // Position in front of the user for clear visibility
+    }
+
+    // Desktop click handler using raycasting
+    function handleDesktopClick(event) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, document.getElementById('camera').object3D.children[0]);
+        
+        // Intersecting with nodes
+        const intersects = raycaster.intersectObjects(Object.values(nodeObjects));
+        if (intersects.length > 0) {
+            const node = intersects[0].object;
+            showVideo(node.userData.video); // Show video on plane
+        }
+    }
+
+    // VR controller click handler for nodes
+    function handleVRClick(event) {
+        const intersected = event.detail.intersectedEl;
+        if (intersected && intersected.object3D.userData.video) {
+            showVideo(intersected.object3D.userData.video);
+        }
+    }
+
+    // Adding click event listeners for desktop and VR
+    window.addEventListener('click', handleDesktopClick, false);
+    document.querySelectorAll('[laser-controls]').forEach(entity => {
+        entity.addEventListener('click', handleVRClick);
+    });
+
+        // Initialize Three.js scene for dynamic layout
+        const scene = document.querySelector('a-scene').object3D;
+        const nodes = [
+            {id: 'Idade', degree: 6, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=100&end=130'},
+            {id: 'Lugares', degree: 2, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=29&end=70'},
+            {id: 'Coisas', degree: 8, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=99&end=150'},
+            {id: 'Céu', degree: 9, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=133&end=180'},
+            {id: 'Crianças', degree: 7, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=140&end=180'},
+            {id: 'Sacada', degree: 4, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=140&end=180'},
+            {id: 'Mar', degree: 3, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=0&end=45'},
+            {id: 'Memórias', degree: 4, video: 'https://www.youtube.com/embed/W8RpTnrJ6n4?start=150&end=190'}
+        ];
+
+        const edges = [
+            {source: 'Idade', target: 'Crianças'},
+            {source: 'Idade', target: 'Céu'},
+            {source: 'Céu', target: 'Crianças'},
+            {source: 'Crianças', target: 'Sacada'},
+            {source: 'Crianças', target: 'Mar'},
+            {source: 'Céu', target: 'Sacada'},
+            {source: 'Mar', target: 'Memórias'},
+            {source: 'Idade', target: 'Memórias'},
+            {source: 'Crianças', target: 'Memórias'}
+        ];
+
+        const nodeObjects = {};  // Store node positions and objects
+        const edgeObjects = [];  // Store edge objects
+        const labelEntities = {}; // Store labels for each node
+
+        // Create nodes and independent labels in the Three.js scene
+        nodes.forEach((node) => {
+            const nodeSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.2 + node.degree * 0.03, 32, 32),
+                new THREE.MeshBasicMaterial({color: 0xF27798})
+            );
+            nodeSphere.position.set(Math.random() * 4 - 2, Math.random() * 4 - 2, Math.random() * 4 - 5);
+            nodeSphere.name = node.id;
+            scene.add(nodeSphere);
+
+            // Create an independent label for each node positioned near the node
+            const labelEntity = document.createElement('a-text');
+            labelEntity.setAttribute('value', node.id);
+            labelEntity.setAttribute('color', '#FFFFFF'); // Set label color to white
+            labelEntity.setAttribute('align', 'center');
+            labelEntity.setAttribute('width', '10'); // Large font size for readability
+            labelEntity.setAttribute('font', 'mozillavr'); // Set readable font
+            labelEntity.setAttribute('transparent', 'true'); // Add transparency
+            labelEntity.setAttribute('opacity', '1'); // Full opacity for clear visibility
+            labelEntity.setAttribute('side', 'double'); // Make it visible from both sides
+            document.querySelector('a-scene').appendChild(labelEntity);
+
+            labelEntities[node.id] = labelEntity; // Store label in dictionary
+
+            nodeSphere.userData = { video: node.video }; // Store video URL
+
+            // Add interaction for video display on click
+            nodeSphere.callback = () => {
+                const videoPlane = document.getElementById('videoPlane');
+                videoPlane.setAttribute('visible', true);
+                videoPlane.setAttribute('material', `src: ${node.video}; transparent: true; opacity: 1; side: double`);
+            };
+
+            nodeSphere.addEventListener('click', nodeSphere.callback);
+            nodeObjects[node.id] = nodeSphere;  // Save to node objects for edges
+        });
+
+        // Create edges with lines between nodes
+        edges.forEach(edge => {
+            const source = nodeObjects[edge.source].position;
+            const target = nodeObjects[edge.target].position;
+            const geometry = new THREE.BufferGeometry().setFromPoints([source, target]);
+            const line = new THREE.Line(
+                geometry,
+                new THREE.LineBasicMaterial({color: 0x2C87BF})
+            );
+            scene.add(line);
+            edgeObjects.push({ line, sourceNode: edge.source, targetNode: edge.target });
+        });
+
+        // Physics and force simulation parameters
+        const repulsionStrength = 0.03;
+        const attractionStrength = 0.002;
+
+        // Update function for force-directed layout and label positions
+        function updateForceDirectedLayout() {
+            const camera = document.getElementById('camera').object3D;
+
+            // Apply repulsion and attraction forces
+            nodes.forEach((nodeA, i) => {
+                const objA = nodeObjects[nodeA.id];
+                nodes.forEach((nodeB, j) => {
+                    if (i !== j) {
+                        const objB = nodeObjects[nodeB.id];
+                        const force = new THREE.Vector3().subVectors(objA.position, objB.position);
+                        const distance = force.length();
+                        if (distance > 0 && distance < 5) {
+                            force.multiplyScalar(repulsionStrength / distance);
+                            objA.position.add(force);
+                            objB.position.sub(force);
+                        }
+                    }
+                });
+            });
+
+            // Attraction between connected nodes
+            edgeObjects.forEach(({ line, sourceNode, targetNode }) => {
+                const source = nodeObjects[sourceNode].position;
+                const target = nodeObjects[targetNode].position;
+                const force = new THREE.Vector3().subVectors(target, source);
+                force.multiplyScalar(attractionStrength);
+                nodeObjects[sourceNode].position.add(force);
+                nodeObjects[targetNode].position.sub(force);
+
+                // Update line positions
+                line.geometry.setFromPoints([source, target]);
+                line.geometry.verticesNeedUpdate = true;
+            });
+
+            // Update label positions to follow their respective nodes and face the camera
+            nodes.forEach((node) => {
+                const nodePosition = nodeObjects[node.id].position;
+                const labelEntity = labelEntities[node.id];
+                
+                // Set label position just above the node
+                labelEntity.setAttribute('position', {
+                    x: nodePosition.x,
+                    y: nodePosition.y + 0.85, // Adjust height as needed
+                    z: nodePosition.z
+                });
+
+                // Apply billboard effect by rotating label to face the camera
+                const labelObject3D = labelEntity.object3D;
+                labelObject3D.lookAt(camera.position);
+            });
+
+            // Schedule the next update
+            requestAnimationFrame(updateForceDirectedLayout);
+        }
+
+        // Start force-directed layout with label update
+        updateForceDirectedLayout();
+
+    </script>
+
+</a-scene>
+</body>
+</html>
